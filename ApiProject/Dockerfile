@@ -1,27 +1,25 @@
-#See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-#Depending on the operating system of the host machines(s) that will build or run the containers, the image specified in the FROM statement may need to be changed.
-#For more information, please see https://aka.ms/containercompat
-
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-nanoserver-1809 AS base
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-
-FROM mcr.microsoft.com/dotnet/sdk:8.0-nanoserver-1809 AS build
-ARG BUILD_CONFIGURATION=Release
+# Usar uma imagem do SDK do .NET para compilar e publicar
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["ApiProject/ApiProject.csproj", "ApiProject/"]
-RUN dotnet restore "./ApiProject/ApiProject.csproj"
+
+# Copiar o arquivo .csproj e restaurar as dependências
+COPY ["ApiProject/ApiProject.Api.csproj", "ApiProject/"]
+
+# Restaurar as dependências
+RUN dotnet restore "ApiProject/ApiProject.Api.csproj"
+
+# Copiar todo o código da aplicação
 COPY . .
+
+# Publicar a aplicação
 WORKDIR "/src/ApiProject"
-RUN dotnet build "./ApiProject.csproj" -c %BUILD_CONFIGURATION% -o /app/build
+RUN dotnet build "ApiProject.Api.csproj" -c Release -o /app/build
 
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./ApiProject.csproj" -c %BUILD_CONFIGURATION% -o /app/publish /p:UseAppHost=false
+# Publicar o projeto
+RUN dotnet publish "ApiProject.Api.csproj" -c Release -o /app/publish
 
-FROM base AS final
+# Usar uma imagem do ASP.NET para rodar a aplicação
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "ApiProject.dll"]
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "ApiProject.Api.dll"]
